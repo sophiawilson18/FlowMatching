@@ -2,9 +2,7 @@
 ._* 
 
 # Folders
-ae_reconstructions_scale8/
-ae_reconstructions_scale16/
-plots_ae_latents/
+ae_experiments/
 wandb/
 logs/
 __pycache__/
