@@ -50,11 +50,7 @@ def pearson_correlation(targets, predictions, eps=1e-8):
     
     # Average over batch dimension
     r_per_channel_time = r_per_batch.mean(dim=0)  # [T, C]
-    
-    # If T=1, squeeze out the time dimension for simpler output format
-    #if T == 1:
-    #    r_per_channel_time = r_per_channel_time.squeeze(0)  # [C]
-        
+
     return r_per_channel_time
 
 
@@ -120,3 +116,67 @@ def vmse_vrmse(targets, predictions, eps=1e-8):
     vrmse = vrmse.mean(dim=0) # [T, C]
 
     return vmse, vrmse
+
+
+
+def pearson_correlation_unified(x1: torch.Tensor, x2: torch.Tensor, eps=1e-8):
+    """
+    Computes Pearson correlation per channel and timestep, supporting both NHWC and NCHW formats.
+
+    Args:
+        x1, x2: Tensors of shape either [B, T, H, W, C] or [B, T, C, H, W]
+        eps: Small constant for numerical stability
+
+    Returns:
+        Tensor of shape [T, C]: Pearson r per timestep and channel
+    """
+    if x1.shape[-1] <= 4:  # assume NHWC if last dim is small (channels)
+        # Permute from [B, T, H, W, C] → [B, T, C, H, W]
+        x1 = x1.permute(0, 1, 4, 2, 3).contiguous()
+        x2 = x2.permute(0, 1, 4, 2, 3).contiguous()
+    
+    B, T, C, H, W = x1.shape
+    x1 = x1.view(B, T, C, -1)  # [B, T, C, H*W]
+    x2 = x2.view(B, T, C, -1)
+
+    x1_mean = x1.mean(dim=-1, keepdim=True)
+    x2_mean = x2.mean(dim=-1, keepdim=True)
+
+    x1_centered = x1 - x1_mean
+    x2_centered = x2 - x2_mean
+
+    numerator = (x1_centered * x2_centered).sum(dim=-1)  # [B, T, C]
+    denominator = torch.sqrt((x1_centered ** 2).sum(dim=-1) * (x2_centered ** 2).sum(dim=-1) + eps)
+
+    r = numerator / denominator  # [B, T, C]
+    return r.mean(dim=0)         # [T, C]
+
+def vmse_vrmse_unified(y_pred: torch.Tensor, y_true: torch.Tensor, eps=1e-8):
+    """
+    Computes VMSE and VRMSE per channel and timestep, supporting both NHWC and NCHW formats.
+
+    Args:
+        y_pred, y_true: Tensors of shape [B, T, H, W, C] or [B, T, C, H, W]
+        eps: Small value for numerical stability
+
+    Returns:
+        Tuple of tensors of shape [T, C]: (VMSE, VRMSE) per channel and timestep
+    """
+    if y_pred.shape[-1] <= 4:  # assume NHWC format
+        y_pred = y_pred.permute(0, 1, 4, 2, 3).contiguous()  # [B, T, C, H, W]
+        y_true = y_true.permute(0, 1, 4, 2, 3).contiguous()
+
+    B, T, C, H, W = y_pred.shape
+
+    mse = ((y_pred - y_true) ** 2).mean(dim=(-2, -1))  # [B, T, C]
+
+    target_mean = y_true.mean(dim=(-2, -1), keepdim=True)  # [B, T, C, 1, 1]
+    target_var = ((y_true - target_mean) ** 2).mean(dim=(-2, -1))  # [B, T, C]
+
+    vmse = mse / (target_var + eps)  # [B, T, C]
+    vrmse = torch.sqrt(vmse)        # [B, T, C]
+
+    vmse_mean = vmse.mean(dim=0)    # [T, C]
+    vrmse_mean = vrmse.mean(dim=0)  # [T, C]
+
+    return vmse_mean, vrmse_mean

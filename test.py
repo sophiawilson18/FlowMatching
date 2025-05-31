@@ -15,7 +15,7 @@ from model.model import Model
 from model.model_ae import Model_AE
 from model.model_ae_simple import Model_AE_Simple
 from utils.get_data import ShearFlowDataset
-from utils.eval_metrics import pearson_correlation, nmse, vmse_vrmse
+from utils.eval_metrics import pearson_correlation, nmse, vmse_vrmse, pearson_correlation_unified, vmse_vrmse_unified
 
 from argparse import ArgumentParser, Namespace as ArgsNamespace
 import csv
@@ -155,8 +155,8 @@ with torch.no_grad():
         # Use the unified functions for metrics calculation
         # Note: Make sure the dimensions are correct - we're expecting [B, T, C, H, W]
         nmse_ = nmse(targets_denom, predictions_denom)
-        r_ = pearson_correlation(targets_denom, predictions_denom)
-        vmse_, vrmse_ = vmse_vrmse(targets_denom, predictions_denom)
+        r_ = pearson_correlation_unified(targets_denom, predictions_denom)
+        vmse_, vrmse_ = vmse_vrmse_unified(targets_denom, predictions_denom)
 
         nmse_all.append(nmse_.cpu())
         r_all.append(r_.cpu())
@@ -182,15 +182,15 @@ os.makedirs(results_dir, exist_ok=True)
 csv_path = os.path.join(results_dir, 'test_loss.csv')
 
 if args.snapshots_to_generate == 1:
-    file_name_nmse = "fm_nmse_one_step.csv"
-    file_name_pearson = "fm_pearson_one_step.csv"
-    file_name_vmse = "fm_vmse_one_step.csv"
-    file_name_vrmse = "fm_vrmse_one_step.csv"
+    file_name_nmse = f"fm_nmse_one_step.csv"
+    file_name_pearson = f"fm_pearson_one_step.csv"
+    file_name_vmse = f"fm_vmse_one_step.csv"
+    file_name_vrmse = f"fm_vrmse_one_step.csv"
 else:
-    file_name_nmse = "fm_nmse_rollout.csv"
-    file_name_pearson = "fm_pearson_rollout.csv"
-    file_name_vmse = "fm_vmse_rollout.csv"
-    file_name_vrmse = "fm_vrmse_rollout.csv"
+    file_name_nmse = f"fm_nmse_rollout.csv"
+    file_name_pearson = f"fm_pearson_rollout.csv"
+    file_name_vmse = f"fm_vmse_rollout.csv"
+    file_name_vrmse = f"fm_vrmse_rollout.csv"
     
 
 

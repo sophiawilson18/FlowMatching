@@ -4,25 +4,19 @@
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:a40:1
 #SBATCH --cpus-per-task=32
-#SBATCH --time=01:00:00
+#SBATCH --time=14:00:00
 #SBATCH --job-name="test"
 
 # Activate the virtual environment with all the dependencies
 conda activate cfm
 
 # Set path
-#export PYTHONPATH="/home/ldr934/minFlowMatching:$PYTHONPATH"
-cd /home/ldr934/minFlowMatching
+cd /home/ldr934/FlowMatching
 export PYTHONPATH=$(pwd):$PYTHONPATH
 
 # See full error
 export HYDRA_FULL_ERROR=1
-
 export CUDA_VISIBLE_DEVICES=0
-
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
 
-python test.py --run-name test2 --snapshots-per-sample 5 --condition-snapshots 4 --snapshots-to-generate 1  
-
-python test.py --run-name test2 --snapshots-per-sample 50 --condition-snapshots 4 --snapshots-to-generate 46
-
+python test.py --run-name scale8 --solver euler --snapshots-per-sample 5 --condition-snapshots 4 --snapshots-to-generate 1  

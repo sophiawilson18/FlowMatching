@@ -1,40 +1,26 @@
+"""
+Train an autoencoder (AE) for the Flow Matching.
+"""
+
+# ---------------- Imports ----------------
 import os
-#import wandb
+import csv
+from copy import deepcopy
+from argparse import ArgumentParser, Namespace as ArgsNamespace
 
 import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-
+import torch.optim.lr_scheduler as lr_scheduler
+from transformers import get_cosine_schedule_with_warmup
 from tqdm import tqdm
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-from model.model_ae import Model_AE
+from model.ae_trainable import AE_trainable
 from utils.get_data import SimpleFlowDataset, EvalSimpleFlowDataset, ShearFlowDataset
 
-import torch.optim.lr_scheduler as lr_scheduler
-from einops import rearrange
-from transformers import get_cosine_schedule_with_warmup
-from argparse import ArgumentParser, Namespace as ArgsNamespace
-from copy import deepcopy
-import csv
-
-torch.cuda.empty_cache()
-
-def print_num_params(model: nn.Module):
-    print(f"{'Module':40} | {'# Params':>10}")
-    print("-" * 55)
-    total_params = 0
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            num = param.numel()
-            print(f"{name:40} | {num:10,}")
-            total_params += num
-    print("-" * 55)
-    print(f"{'Total trainable parameters':40} | {total_params:10,}")
-
-
+# ---------------- Argument Parsing ----------------
 def parse_args() -> ArgsNamespace:
     parser = ArgumentParser()
     parser.add_argument("--run-name", type=str, required=True, help="Name of the current run.")
@@ -54,42 +40,28 @@ def parse_args() -> ArgsNamespace:
     parser.add_argument("--test_batch_size", type=int, default=8, help="Test batch size.")
 
     parser.add_argument("--snapshots-per-sample", type=int, default=25, help="Number of snapshots per sample.")
-
-    # SW: Add this line to support the checkpoint path argument
     parser.add_argument("--path_to_ae_checkpoints", type=str, default="./ae/checkpoints", help="Path to save AE model checkpoints.")
-
 
     return parser.parse_args()
 
 args = parse_args()
 
-
-# Launch processes.
+# ---------------- Device and Seed Setup ----------------
 print('Launching processes...')
+def set_seed(seed: int):
+    np.random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
-#wandb.login(key="9b17d67ba9f4c654b23d497c8899c4cd1a7a65b4")
-#
-#run = wandb.init(
-#    # Set the project where this run will be logged
-#    project="minFlowMatching_ae_pretraining",
-#    name=args.run_name,
-#    # Track hyperparameters and run metadata
-#    config={
-#        "learning_rate": args.ae_learning_rate,
-#        "epochs": args.ae_epochs,
-#    },
-#)
-
-# Initialize
-np.random.seed(args.random_seed)
-os.environ['PYTHONHASHSEED'] = str(args.random_seed)
-torch.manual_seed(args.random_seed)
+set_seed(args.random_seed)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-if torch.cuda.is_available():
-    torch.cuda.manual_seed_all(args.random_seed)
-torch.backends.cudnn.deterministic = True    
-torch.backends.cudnn.benchmark = False
+print(f"Using device: {device}")
 
+# ---------------- Data Preparation ----------------
 if args.dataset == 'shearflow':
     in_channels = 4
     out_channels = 4
@@ -111,7 +83,6 @@ if args.dataset == 'shearflow':
 
     train_loader = DataLoader(train_dataset, batch_size=args.train_batch_size, shuffle=True, num_workers=4, pin_memory=True, drop_last=True)
     val_loader = DataLoader(val_dataset, batch_size=args.test_batch_size, shuffle=False, num_workers=4, pin_memory=True)
-    test_loader = DataLoader(test_dataset, batch_size=args.test_batch_size, shuffle=False, num_workers=4, pin_memory=True)
 
 elif args.dataset == 'simpleflow':
     in_channels = 1 
@@ -130,29 +101,26 @@ elif args.dataset == 'simpleflow':
 
     val_loader = DataLoader(dataset=datasets['val'], batch_size=args.train_batch_size,
             shuffle=False, num_workers=4)
-
-    test_loader = DataLoader(dataset=datasets['test'], batch_size=args.test_batch_size,
-            shuffle=False, num_workers=4)
 else:
     raise ValueError('Invalid dataset option!')
 
 
-# Setup losses
+# ---------------- Loss Setup ----------------
 if args.ae_loss == "mse":
     ae_mse_loss_fun = nn.MSELoss()  
 
 
-ae_epochs = args.ae_epochs 
+# ---------------- Model Setup ----------------
 if args.ae_option == "ae":
-    ae_model = Model_AE(state_size=state_size, in_channels=in_channels, out_channels=out_channels, enc_mid_channels=enc_mid_channels, dec_mid_channels=dec_mid_channels)
+    ae_model = AE_trainable(state_size=state_size, in_channels=in_channels, out_channels=out_channels, enc_mid_channels=enc_mid_channels, dec_mid_channels=dec_mid_channels)
 else:
     raise ValueError('Invalid ae option!')
 
 total_params_ae = sum(p.numel() for p in ae_model.parameters() if p.requires_grad)
 print('# trainable parameters: ', total_params_ae)
-#print_num_params(ae_model)
-
 ae_model.to(device)
+
+# ---------------- Optimizer and Scheduler Setup ----------------
 ae_optimizer = torch.optim.AdamW(
         ae_model.parameters(),
         lr=args.ae_learning_rate,
@@ -164,22 +132,21 @@ if args.ae_lr_scheduler == "exponential":
 elif args.ae_lr_scheduler == "cosine":
     ae_lr_scheduler = get_cosine_schedule_with_warmup(ae_optimizer, 
     num_warmup_steps=len(train_loader) * 5, # we need only a very shot warmup phase for our data
-    num_training_steps=(len(train_loader) * ae_epochs))
+    num_training_steps=(len(train_loader) * args.ae_epochs))
     #ae_lr_scheduler = lr_scheduler.CosineAnnealingLR(ae_optimizer, T_max=10, eta_min=0)
 
 
-# --- ADDED: Early stopping setup ---
-BEST_AE_PATH = os.path.join(args.path_to_ae_checkpoints, f"AE_best.pt")
+# ---------------- Checkpoints and Early Stopping Setup ----------------
+BEST_AE_PATH = os.path.join(args.path_to_ae_checkpoints, "ae_" + args.dataset + ".pt") 
 best_val_loss = float("inf")
 best_ae_state_dict = None
-patience = 6
+patience = args.early_stopping_patience if hasattr(args, 'early_stopping_patience') else 5
 patience_counter = 0
-# -----------------------------------
-
 train_losses = []
 val_losses = []
 
-for epoch in range(ae_epochs):
+# ---------------- Training Loop ----------------
+for epoch in range(args.ae_epochs):
     ae_model.train()
     train_gen = tqdm(train_loader, desc="Training")
     
@@ -188,7 +155,7 @@ for epoch in range(ae_epochs):
 
     for batch in train_gen:
         # Fetch data
-        observations = batch.cuda()
+        observations = batch.to(device)
 
         if args.ae_option == "ae":
             input_snapshots, reconstructed_snapshots = ae_model(observations)
@@ -209,9 +176,6 @@ for epoch in range(ae_epochs):
     # update learning rate
     ae_lr_scheduler.step()
 
-    # Optional: clean up GPU memory between epochs
-    torch.cuda.empty_cache()
-
     # Log training loss
     epoch_loss = total_loss / batch_count
     train_losses.append(epoch_loss)
@@ -219,12 +183,12 @@ for epoch in range(ae_epochs):
     print(f"Epoch = {epoch}, train loss = {epoch_loss:.6f}")
     #wandb.log({"Train loss": epoch_loss})
 
-    # --- ADDED: Validation + early stopping ---
+    # ---------------- Validation loop ----------------
     ae_model.eval()
     val_loss = 0.0
     with torch.no_grad():
         for val_batch in val_loader:
-            val_batch = val_batch.cuda()
+            val_batch = val_batch.to(device)
             input_snapshots, reconstructed_snapshots = ae_model(val_batch)
             loss = ae_mse_loss_fun(input_snapshots, reconstructed_snapshots)
             val_loss += loss.item()
@@ -234,12 +198,13 @@ for epoch in range(ae_epochs):
     print(f"Epoch = {epoch}, val loss = {val_loss:.6f}")
     #wandb.log({"Val loss": val_loss})
 
-    # save checkpoints every third epoch
+    # Save checkpoints every third epoch
     if epoch % 3 == 0:
-        checkpoint_path = os.path.join(args.path_to_ae_checkpoints, f"AE_epoch{epoch}.pt")
+        checkpoint_path = os.path.join(args.path_to_ae_checkpoints, "ae_" + args.dataset + "_epoch" + epoch + ".pt") 
         torch.save(ae_model.state_dict(), checkpoint_path)
         print(f"✅ Saved checkpoint at epoch {epoch}")
 
+    # Early stopping
     if val_loss < best_val_loss:
         best_val_loss = val_loss
         best_ae_state_dict = deepcopy(ae_model.state_dict())
@@ -253,15 +218,15 @@ for epoch in range(ae_epochs):
     if patience_counter >= patience:
         print("⛔ Early stopping triggered")
         break
-    # ---
-
 
 print('✅  Done with training AE...')
 
-# save train loss and val loss
+
+# ---------------- Save Losses and Plot ----------------
 train_losses = np.array(train_losses)
 val_losses = np.array(val_losses)
 
+os.makedirs('ae/results', exist_ok=True)
 with open(f'ae/results/train_val_loss.csv', 'w') as f:
     writer = csv.writer(f)
     writer.writerows(zip(train_losses, val_losses))
@@ -278,13 +243,5 @@ plt.title(f'AE')
 plt.grid(True)
 plt.xlim(-1, len(train_losses))
 plt.yscale('log')
-
-
-# save plot
 plt.savefig(f'ae/results/train_val_loss.png')
 print('✅  Plot saved.')
-
-# Save final model (optional)
-FINAL_PATH = os.path.join(args.path_to_ae_checkpoints, f"AE_final.pt")
-torch.save(ae_model.state_dict(), FINAL_PATH)
-print('✅  Final AE model saved.')

@@ -1,4 +1,21 @@
 .DS_Store
+._* 
+
+# Folders
+ae_reconstructions_scale8/
+ae_reconstructions_scale16/
+plots_ae_latents/
+wandb/
+logs/
+__pycache__/
+
+# Scripts
+ae_latent_space.py
+test_AE.sh
+AE_fixed_bounds.py
+plot_latents.py
+plot_latents.sh
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

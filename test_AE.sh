@@ -11,16 +11,13 @@
 conda activate cfm
 
 # Set path
-#export PYTHONPATH="/home/ldr934/minFlowMatching:$PYTHONPATH"
-cd /home/ldr934/minFlowMatching
+cd /home/ldr934/FlowMatching
 export PYTHONPATH=$(pwd):$PYTHONPATH
 
 # See full error
 export HYDRA_FULL_ERROR=1
-
 export CUDA_VISIBLE_DEVICES=0
-
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
 
-python test_AE.py 
+python AE_fixed_bounds.py 
 
