@@ -6,6 +6,7 @@ ae_experiments/
 wandb/
 logs/
 __pycache__/
+results/
 
 # Scripts
 ae_latent_space.py
