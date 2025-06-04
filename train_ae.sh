@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --gres=gpu:a40:1
 #SBATCH --cpus-per-task=32
-#SBATCH --time=01:00:00
+#SBATCH --time=03:00:00
 #SBATCH --job-name="ae"
 
 # Activate the virtual environment with all the dependencies

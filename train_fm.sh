@@ -19,6 +19,6 @@ export HYDRA_FULL_ERROR=1
 export CUDA_VISIBLE_DEVICES=0
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128
 
-carbontracker python train_fm.py --run-name test_code  --learning-rate 5e-3 --weight-decay 1e-4 --scale 16 --train_option data-space --epochs 1  --snapshots-per-sample 5 --condition-snapshots 4 --snapshots-to-generate 1 
+carbontracker python train_fm.py --run-name test_endtoend  --dataset simpleflow --learning-rate 5e-3 --weight-decay 1e-4 --scale 16 --train_option end-to-end --epochs 1  --snapshots-per-sample 5 --condition-snapshots 4 --snapshots-to-generate 1 
 
 

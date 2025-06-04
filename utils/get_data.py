@@ -381,7 +381,7 @@ class SimpleFlowDataset(Dataset):
         self.snapshots_per_sample = snapshots_per_sample
 
         # Read dataset
-        data = np.load("/home/ldr934/minFlowMatching/data/simple_flow.npy") 
+        data = np.load("/home/ldr934/FlowMatching/data/simple_flow.npy") 
 
         
 
@@ -416,7 +416,7 @@ class EvalSimpleFlowDataset(Dataset):
         self.snapshots_per_sample = snapshots_per_sample
 
         # Read dataset
-        data = np.load('/home/ldr934/minFlowMatching/data/simple_flow.npy') 
+        data = np.load('/home/ldr934/FlowMatching/data/simple_flow.npy') 
 
         data = data.reshape(data.shape[0],64,64,1)
         self.flow = data[125:150,:,:,:]

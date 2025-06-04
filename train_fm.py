@@ -39,9 +39,10 @@ def parse_args() -> ArgsNamespace:
     parser.add_argument("--snapshots-to-generate", type=int, default=20, help="Number of snapshots to generate for each sample during evaluation.")
 
     # paths 
-    parser.add_argument("--path_to_checkpoints", type=str, default='/home/ldr934/FlowMatching/checkpoints/', help="Path to the checkpoints of pre-trained ae.")
+    parser.add_argument("--path_to_fm_checkpoints", type=str, default='/home/ldr934/FlowMatching/checkpoints/', help="Path to save FM model checkpoints.")
+    parser.add_argument("--path_to_ae_checkpoints", type=str, default="./ae/checkpoints", help="Path with saved AE model checkpoints.")
     parser.add_argument("--path_to_results", type=str, default='/home/ldr934/FlowMatching/results', help="Path to save the results.")
-
+    
     # optimizer parameters
     parser.add_argument("--learning-rate", type=float, default=0.00005, help="Learning rate.") 
     parser.add_argument("--weight-decay", type=float, default=0, help="Weight decay.")
@@ -156,7 +157,7 @@ if args.train_option == "end-to-end": # end-to-end training with trainable autoe
 
 elif args.train_option == "separate": # separate training with trainable autoencoder
     print("Loading AE model...")
-    AE_PATH = args.path_to_checkpoints + "ae_" + args.dataset + ".pt"
+    AE_PATH = args.path_to_ae_checkpoints + "ae_" + args.dataset + ".pt"
     ae_model = AE_trainable(state_size=state_size, in_channels=in_channels, out_channels=out_channels, enc_mid_channels=enc_mid_channels, dec_mid_channels=dec_mid_channels)
     ae_model.load_state_dict(torch.load(AE_PATH, map_location=device))
     ae_model.to(device)
@@ -198,7 +199,7 @@ lr_scheduler = get_cosine_schedule_with_warmup(optimizer=optimizer,
 
 
 # ---------------- Checkpoints and Early Stopping Setup ----------------
-BEST_FM_PATH = os.path.join(args.path_to_checkpoints)
+BEST_FM_PATH = os.path.join(args.path_to_fm_checkpoints)
 os.makedirs(BEST_FM_PATH, exist_ok=True)
 best_fm_state_dict = None
 best_val_loss = float('inf')
@@ -265,10 +266,26 @@ for epoch in range(args.epochs):
         val_loss = 0.0
         
         for batch in val_gen:
-            observations = batch.to(device)
-            input_snapshots = observations[:, :args.condition_snapshots]
-            target_vectors, reconstructed_vectors = model(input_snapshots, option=args.probpath_option)
-            val_mse = val_mse_loss_fun(target_vectors, reconstructed_vectors)
+
+            if args.train_option == "end-to-end":
+                observations = batch.to(device)
+                input_snapshots, reconstructed_snapshots, target_vectors, reconstructed_vectors = model(observations, option=args.probpath_option)
+                val_flow_matching_loss = flow_matching_mse_loss_fun(target_vectors, reconstructed_vectors)
+                val_ae_loss = ae_mse_loss_fun(input_snapshots, reconstructed_snapshots)
+                val_mse = val_flow_matching_loss + val_ae_loss
+
+            elif args.train_option == "separate":
+                observations = batch.to(device)
+                target_vectors, reconstructed_vectors = model(observations, option=args.probpath_option)
+                val_mse = flow_matching_mse_loss_fun(target_vectors, reconstructed_vectors)
+
+            elif args.train_option == "data-space":
+                observations = batch.to(device)
+                input_snapshots = observations[:, :args.condition_snapshots]
+                target_vectors, reconstructed_vectors = model(input_snapshots, option=args.probpath_option)
+                val_mse = val_mse_loss_fun(target_vectors, reconstructed_vectors)
+
+
             val_loss += val_mse.item()
 
         val_mse_mean = val_loss / len(val_loader)

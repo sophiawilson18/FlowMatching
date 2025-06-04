@@ -181,7 +181,6 @@ for epoch in range(args.ae_epochs):
     train_losses.append(epoch_loss)
 
     print(f"Epoch = {epoch}, train loss = {epoch_loss:.6f}")
-    #wandb.log({"Train loss": epoch_loss})
 
     # ---------------- Validation loop ----------------
     ae_model.eval()
@@ -196,11 +195,11 @@ for epoch in range(args.ae_epochs):
     val_loss = val_loss / max(1, len(val_loader))
     val_losses.append(val_loss)
     print(f"Epoch = {epoch}, val loss = {val_loss:.6f}")
-    #wandb.log({"Val loss": val_loss})
 
     # Save checkpoints every third epoch
     if epoch % 3 == 0:
-        checkpoint_path = os.path.join(args.path_to_ae_checkpoints, "ae_" + args.dataset + "_epoch" + epoch + ".pt") 
+        os.makedirs(args.path_to_ae_checkpoints, exist_ok=True)
+        checkpoint_path = os.path.join(args.path_to_ae_checkpoints, "ae_" + args.dataset + "_epoch" + str(epoch) + ".pt") 
         torch.save(ae_model.state_dict(), checkpoint_path)
         print(f"✅ Saved checkpoint at epoch {epoch}")
 
