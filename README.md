@@ -1,10 +1,46 @@
-# A minimalistic implementation of FlowMatching for Fluid Flows
+# Flow Matching for Spatiotemporal Forecasting in Data Space
 
-Run simple examples: 
+This repository contains experiments exploring FLow Matching for spatiotempoeral forecasting in data space. The data used in these experiments is downloaded from the [The Well dataset](https://github.com/PolymathicAI/the_well/tree/master). The repository contains a small dataset to get you started. 
+
+## Acknowledgements and Original Sources
+
+Parts of the code in this repository are adapted from:
+
+- [Elucidating the Design Choice of Probability Paths in Flow Matching for Forecasting]([https://arxiv.org/abs/2410.03229](https://arxiv.org/html/2410.03229v1#bib.bib14)) by Lim et al. (2025), licensed under CC BY 4.0.
+
+We have modified the original code to fit the scope of this project.
+
+### 1. Clone this repository
+```
+git clone https://github.com/sophiawilson18/FlowMatching.git
+cd FlowMatching
+```
+
+### 2. Set up the conda environment
+We recommend using conda for managing dependencies:
 
 ```
-export CUDA_VISIBLE_DEVICES=0;  python train_ae.py --run-name simpleflow_ae --dataset simpleflow --ae_option ae --ae_epochs 2000 --snapshots-per-sample 25 --ae_lr_scheduler cosine --ae_learning_rate 0.001 --path_to_ae_checkpoints your-path
-
-export CUDA_VISIBLE_DEVICES=0; python train.py --run-name simpleflow_ours_sigma0.01_samplingsteps10_euler_separate_sigmasam0.0 --dataset simpleflow --train_option separate --probpath_option ours  --epochs 2000 --sampling_steps 10 --sigma 0.01 --sigma_sam 0.0 --solver euler --snapshots-per-sample 25 --snapshots-to-generate 20 --path_to_ae_checkpoints your-path --path_to_results your-path
-
+conda create -n flowmatching python=3.10
+conda activate flowmatching
+pip install -r requirements.txt
 ```
+
+### 3. Running Experiments
+
+The original implementation of Flow Matching was performed in latent space, using an autoencoder that could be trained either separately or jointly (end-to-end) with the Flow Matching model. In contrast, our implementation focuses on performing Flow Matching directly in data space.
+
+
+To run Flow Matching in data space, use:
+```
+carbontracker python train_fm.py --run-name fm_dataspace \
+   --scale 16 --train_option data-space --epochs 1 \
+```
+
+### License
+
+This repository itself is licensed under the MIT License.
+Parts of the code adapted from Lim et al. (2025) are licensed under CC BY 4.0.
+
+### Contact
+
+For questions or collaborations, feel free to open an issue or contact me via email: sophia.wilson@nbi.ku.dk
