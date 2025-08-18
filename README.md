@@ -43,4 +43,5 @@ Parts of the code adapted from Lim et al. (2025) are licensed under CC BY 4.0.
 
 ### Contact
 
-For questions or collaborations, feel free to open an issue or contact me via email: sophia.wilson@nbi.ku.dk
+For questions or collaborations, feel free to open an issue or contact me via email: sophia.wilson@di.ku.dk
+
