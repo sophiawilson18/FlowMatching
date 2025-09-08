@@ -4,7 +4,7 @@ This repository contains experiments exploring FLow Matching for spatiotempoeral
 
 ## Acknowledgements and Original Sources
 
-Parts of the code in this repository are adapted from:
+The code in this repository are adapted from:
 
 - [Elucidating the Design Choice of Probability Paths in Flow Matching for Forecasting]([https://arxiv.org/abs/2410.03229](https://arxiv.org/html/2410.03229v1#bib.bib14)) by Lim et al. (2025), licensed under CC BY 4.0.
 
@@ -44,4 +44,5 @@ Parts of the code adapted from Lim et al. (2025) are licensed under CC BY 4.0.
 ### Contact
 
 For questions or collaborations, feel free to open an issue or contact me via email: sophia.wilson@di.ku.dk
+
 
